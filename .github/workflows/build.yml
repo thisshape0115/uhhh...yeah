@@ -22,32 +22,31 @@ jobs:
       - name: Unzip project
         run: |
           ZIP_PATH=$(find . -name "*.zip" -not -path "./.git/*" | head -1)
-          
-          if [ -z "$ZIP_PATH" ]; then
-            echo "❌ ZIP 파일을 찾을 수 없습니다."
-            exit 1
-          fi
-          
           echo "✅ ZIP 발견: $ZIP_PATH"
           unzip -o "$ZIP_PATH" -d ./project
 
-      - name: Find and build APK
+      - name: Fix Gradle version
         run: |
           GRADLEW_PATH=$(find ./project -name "gradlew" -type f | head -1)
-          
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "❌ gradlew 파일을 찾을 수 없습니다."
-            echo "📂 압축 해제된 구조:"
-            find ./project -type f | head -30
-            exit 1
-          fi
-          
-          echo "✅ gradlew 발견: $GRADLEW_PATH"
           PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           
+          # gradle-wrapper.properties에서 버전 강제 변경
+          WRAPPER_PROPS=$(find "$PROJECT_DIR" -name "gradle-wrapper.properties" | head -1)
+          echo "📄 wrapper 경로: $WRAPPER_PROPS"
+          cat "$WRAPPER_PROPS"
+          
+          # Gradle 8.7로 다운그레이드
+          sed -i 's|gradle-[0-9]*\.[0-9]*\(\.[0-9]*\)*-[a-z]*\.zip|gradle-8.7-bin.zip|g' "$WRAPPER_PROPS"
+          echo "✅ 변경 후:"
+          cat "$WRAPPER_PROPS"
+
+      - name: Build APK
+        run: |
+          GRADLEW_PATH=$(find ./project -name "gradlew" -type f | head -1)
+          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           cd "$PROJECT_DIR"
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --warning-mode all
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
