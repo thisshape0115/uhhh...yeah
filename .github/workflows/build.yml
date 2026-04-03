@@ -36,38 +36,44 @@ jobs:
           WRAPPER_PROPS=$(find ./project -name "gradle-wrapper.properties" | head -1)
           printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > "$WRAPPER_PROPS"
 
-      - name: Show and patch app/build.gradle
+      - name: Show build.gradle and patch
         run: |
           BUILD_GRADLE=$(find ./project -path "*/app/build.gradle" | head -1)
-          echo "===== 현재 build.gradle 내용 ====="
+          echo "PATH: $BUILD_GRADLE"
+          echo "===== BEFORE ====="
           cat "$BUILD_GRADLE"
-          echo "=================================="
+          echo "===== END ====="
 
-          python3 << 'PYEOF'
-          import re, sys
-
-          path = None
-          import subprocess
+          python3 -c "
+          import re, subprocess
           result = subprocess.run(['find', './project', '-path', '*/app/build.gradle'], capture_output=True, text=True)
           path = result.stdout.strip().split('\n')[0]
-          print(f"수정할 파일: {path}")
-
           with open(path, 'r') as f:
               content = f.read()
-
-          # compileSdk 교체 (공백/등호 방식 모두)
-          content = re.sub(r'compileSdk\s*=?\s*\d+', 'compileSdk = 34', content)
-          content = re.sub(r'compileSdkVersion\s*=?\s*\d+', 'compileSdkVersion = 34', content)
-          # targetSdk 교체
-          content = re.sub(r'targetSdk\s*=?\s*\d+', 'targetSdk = 34', content)
-          content = re.sub(r'targetSdkVersion\s*=?\s*\d+', 'targetSdkVersion = 34', content)
-
+          content = re.sub(r'compileSdk\s*[=]?\s*\d+', 'compileSdk = 34', content)
+          content = re.sub(r'compileSdkVersion\s*[=]?\s*\d+', 'compileSdkVersion = 34', content)
+          content = re.sub(r'targetSdk\s*[=]?\s*\d+', 'targetSdk = 34', content)
+          content = re.sub(r'targetSdkVersion\s*[=]?\s*\d+', 'targetSdkVersion = 34', content)
           with open(path, 'w') as f:
               f.write(content)
-
-          print("===== 수정 후 build.gradle =====")
+          print('PATCHED:')
           print(content)
-          PYEOF
+          "
+
+      - name: Install Android SDK platform 34
+        run: |
+          sudo apt-get install -y wget unzip
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdtools.zip
+          unzip -q /tmp/cmdtools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | sdkmanager --licenses > /dev/null 2>&1
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
 
       - name: Build APK
         run: |
