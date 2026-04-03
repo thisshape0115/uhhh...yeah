@@ -34,11 +34,20 @@ jobs:
       - name: Patch gradle-wrapper.properties
         run: |
           WRAPPER_PROPS=$(find ./project -name "gradle-wrapper.properties" | head -1)
-          echo "현재 내용:"
-          cat "$WRAPPER_PROPS"
           printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > "$WRAPPER_PROPS"
-          echo "변경 후:"
-          cat "$WRAPPER_PROPS"
+
+      - name: Patch compileSdk and targetSdk
+        run: |
+          BUILD_GRADLE=$(find ./project -path "*/app/build.gradle" | head -1)
+          echo "수정 전:"
+          cat "$BUILD_GRADLE"
+          
+          # compileSdk, targetSdk를 34로 올리기
+          sed -i 's/compileSdk[= ]*[0-9]*/compileSdk = 34/g' "$BUILD_GRADLE"
+          sed -i 's/targetSdk[= ]*[0-9]*/targetSdk = 34/g' "$BUILD_GRADLE"
+          
+          echo "수정 후:"
+          cat "$BUILD_GRADLE"
 
       - name: Build APK
         run: |
