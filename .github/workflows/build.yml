@@ -25,20 +25,38 @@ jobs:
           echo "✅ ZIP 발견: $ZIP_PATH"
           unzip -o "$ZIP_PATH" -d ./project
 
-      - name: Fix Gradle version
+      - name: Force Gradle 8.7
         run: |
-          GRADLEW_PATH=$(find ./project -name "gradlew" -type f | head -1)
-          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-          
-          # gradle-wrapper.properties에서 버전 강제 변경
-          WRAPPER_PROPS=$(find "$PROJECT_DIR" -name "gradle-wrapper.properties" | head -1)
-          echo "📄 wrapper 경로: $WRAPPER_PROPS"
+          WRAPPER_PROPS=$(find ./project -name "gradle-wrapper.properties" | head -1)
+          echo "📄 현재 wrapper 내용:"
           cat "$WRAPPER_PROPS"
           
-          # Gradle 8.7로 다운그레이드
-          sed -i 's|gradle-[0-9]*\.[0-9]*\(\.[0-9]*\)*-[a-z]*\.zip|gradle-8.7-bin.zip|g' "$WRAPPER_PROPS"
+          # Gradle 8.7로 강제 교체
+          cat > "$WRAPPER_PROPS" << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+          
           echo "✅ 변경 후:"
           cat "$WRAPPER_PROPS"
+
+      - name: Fix app/build.gradle (AGP 호환)
+        run: |
+          BUILD_GRADLE=$(find ./project -path "*/app/build.gradle" | head -1)
+          echo "📄 build.gradle 경로: $BUILD_GRADLE"
+          
+          # namespace, compileSdk 등 = 문법으로 교체
+          sed -i 's/namespace "\(.*\)"/namespace = "\1"/g' "$BUILD_GRADLE"
+          sed -i 's/compileSdk \([0-9]*\)/compileSdk = \1/g' "$BUILD_GRADLE"
+          sed -i 's/minSdk \([0-9]*\)/minSdk = \1/g' "$BUILD_GRADLE"
+          sed -i 's/targetSdk \([0-9]*\)/targetSdk = \1/g' "$BUILD_GRADLE"
+          sed -i 's/viewBinding true/viewBinding = true/g' "$BUILD_GRADLE"
+          
+          echo "✅ 수정된 build.gradle:"
+          cat "$BUILD_GRADLE"
 
       - name: Build APK
         run: |
@@ -46,7 +64,8 @@ jobs:
           PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           cd "$PROJECT_DIR"
           chmod +x gradlew
-          ./gradlew assembleDebug --warning-mode all
+          # Gradle 캐시 무시하고 새로 다운로드
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
