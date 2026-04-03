@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # 구버전 환경 사용
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -28,7 +28,7 @@ jobs:
       - name: Unzip project
         run: |
           ZIP_PATH=$(find . -name "*.zip" -not -path "./.git/*" | head -1)
-          echo "✅ ZIP 발견: $ZIP_PATH"
+          echo "ZIP 발견: $ZIP_PATH"
           unzip -o "$ZIP_PATH" -d ./project
 
       - name: Patch gradle-wrapper.properties
@@ -36,24 +36,15 @@ jobs:
           WRAPPER_PROPS=$(find ./project -name "gradle-wrapper.properties" | head -1)
           echo "현재 내용:"
           cat "$WRAPPER_PROPS"
-          # 통째로 덮어쓰기
-          cat > "$WRAPPER_PROPS" << 'EOF'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
+          printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > "$WRAPPER_PROPS"
           echo "변경 후:"
           cat "$WRAPPER_PROPS"
 
-      - name: Build APK (use system Gradle, bypass wrapper)
+      - name: Build APK
         run: |
           GRADLEW_PATH=$(find ./project -name "gradlew" -type f | head -1)
           PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           cd "$PROJECT_DIR"
-          chmod +x gradlew
-          # gradlew 대신 직접 설치한 gradle 8.7 사용
           gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
